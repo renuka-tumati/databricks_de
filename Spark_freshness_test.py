@@ -11,6 +11,14 @@ from pyspark.sql import functions as fun
 # COMMAND ----------
 
 # MAGIC %md
+# MAGIC numpy -  NumPy is a fundamental package for scientific computing in Python
+# MAGIC mlflow - to log and track your machine learning experiments, including parameters, metrics, and artifacts.Auto logging, access to frameworks etc.
+# MAGIC sklearn-  which is part of the MLflow library, helps with classification problems exampleu want to predict whether an email is spam or not based on its content
+# MAGIC Plotly.express or px -is a high-level API for creating figures using Plotly, a free and open-source graphing library for Python.
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC Read all tables last modified times and load to new freshness_measure table. 
 # MAGIC
 
@@ -145,6 +153,12 @@ while i < 76:
 
 # COMMAND ----------
 
+# MAGIC %md
+# MAGIC Query the data with introduced anomolies
+# MAGIC
+
+# COMMAND ----------
+
 time_series = sqlContext.sql("""select distinct
               measureAt,
               lastModified,
@@ -158,7 +172,7 @@ time_series = sqlContext.sql("""select distinct
 time_series.lastModified = pd.to_datetime(time_series.lastModified)
 time_series.measureAt = pd.to_datetime(time_series.measureAt)
 
-print(time_series)
+display(time_series)
 
 
 # COMMAND ----------
@@ -168,40 +182,36 @@ px.scatter(x=time_series.lastModified, y=time_series.val)
 
 # COMMAND ----------
 
-px.scatter(x=time_series.measureAt, y=time_series.val)
+# MAGIC %md
+# MAGIC What if the Job which collects updated times did not run, check for that
+# MAGIC
 
 # COMMAND ----------
 
-differences = time_series.assign(delaySecods=lambda x:(x.lastModified - time_series.shift(periods=1, axis="rows").lastModified/ np.timedelta64(1, 's')))
+px.scatter(x=time_series.measureAt, y=time_series.val)
 
 # COMMAND ----------
 
 import numpy as np
 
-# Assuming 'lastModified' is a datetime column in your DataFrame
-time_series['delaySeconds'] = (time_series['lastModified'] - time_series['lastModified'].shift(1)) / np.timedelta64(1, 's')
-time_series['delayMinutes'] = (time_series['lastModified'] - time_series['lastModified'].shift(1)) / np.timedelta64(1, 'm')
-print(time_series)
-#differences = time_series.assign(delaySeconds=lambda x: (x['lastModified'] - time_series.shift(periods=1)['lastModified']) / np.timedelta64(1, 's'))
+
+
+differences = time_series.assign(delaySeconds=lambda x: (x['lastModified'] - time_series.shift(periods=1)['lastModified']) / np.timedelta64(1, 's'))
 
 differences = time_series.assign(delayMinutes=lambda x: (x['lastModified'] - time_series.shift(periods=1)['lastModified']) / np.timedelta64(1, 'm'))
-print(differences)
+display(differences)
 
 
 
 # COMMAND ----------
 
-print(differences[differences['delaySeconds'] > 86400])
+display(differences[differences['delaySeconds'] > 100000])
 
 
 # COMMAND ----------
 
 differences = differences.loc[~(differences.delaySeconds==0)].dropna().reset_index()
-print(differences)
-
-# COMMAND ----------
-
-print(differences[differences['delaySeconds'] > 100000])
+display(differences)
 
 # COMMAND ----------
 
@@ -217,6 +227,11 @@ px.bar(x=differences.lastModified, y = differences.delaySeconds)
 
 # COMMAND ----------
 
+# MAGIC %md
+# MAGIC activate ml flow run to capture. MLflow automatically logs the model's parameters, metrics, and artifacts to the active MLflow run.
+
+# COMMAND ----------
+
 mlflow.sklearn.autolog()
 
 # COMMAND ----------
@@ -227,14 +242,19 @@ mlflow.sklearn.autolog()
 #autolog_run = mlflow.last_active_run()
 
 from sklearn.neighbors import LocalOutlierFactor
+"""This imports the LocalOutlierFactor class from the scikit-learn library, which is used for outlier detection."""
 
 # Reshape the input data to have 2D shape
 X = differences[["delaySeconds"]].values.reshape(-1, 1)
 
 # Initialize and fit the LocalOutlierFactor model
 clf = LocalOutlierFactor(n_neighbors=10)
+"""This initializes the LocalOutlierFactor model with a parameter n_neighbors set to 10. LocalOutlierFactor is an unsupervised outlier detection method that calculates the local density deviation of a data point with respect to its neighbors."""
 predictions = clf.fit_predict(X)
+"""This line fits the LocalOutlierFactor model to the input data X and predicts the labels of the input data points. The label 1 indicates an inlier (normal data point), while -1 indicates an outlier."""
+
 autolog_run = mlflow.last_active_run()
+"""This line retrieves the information of the last active MLflow run and assigns it to the variable autolog_run. This could be used later to access the logged information about the model training process."""
 
 # Now you can use 'predictions' for further analysis
 
@@ -245,12 +265,12 @@ clf.negative_outlier_factor_
 
 # COMMAND ----------
 
-spikes = differences[differences['delaySeconds'] > 80000]
+spikes = differences[differences['delaySeconds'] > 100000]
 
 # Plot the bars
 fig = px.bar(x=spikes['lastModified'], y=spikes ['delaySeconds'] )
 for i, v in enumerate(predictions):
-  if v ==-1: fig.add_vline(x=differences.iloc[i].lastModified, line_color="red", opacity=0.4)
+  if v > -1: fig.add_vline(x=differences.iloc[i].lastModified, line_color="red", opacity=0.4)
 fig.show()
 
 # COMMAND ----------
