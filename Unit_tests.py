@@ -2,67 +2,82 @@
 import pandas as pd
 import unittest
 
-def transform_data_col(column):
+def transform_data_sum(column):
     # Logic to transform the extracted data
     # For demonstration, let's assume aggregation by summing integers in each cell of the DataFrame column
     aggregated_data = column.sum()
     return aggregated_data
 
+
+def transform_data_avg(column,count):
+    # Logic to transform the extracted data
+    # For demonstration, let's assume aggregation by summing integers in each cell of the DataFrame column
+    avg_data = column.sum()/count
+    return avg_data
+
 class TestTransformDataCol(unittest.TestCase):
-    def test_transform_data_col(self):
+    def test_transform_data_sum(self):
         # Arrange
         source_data = pd.DataFrame({"col1": [10, 20, 30, 40, 50, 60, 70, 80, 90]})  # Sample input DataFrame
         
         # Act
-        transformed_data = transform_data_col(source_data["col1"])
+        transformed_data = transform_data_sum(source_data["col1"])
         sum_of_column = source_data['col1'].sum()
         
         # Assert
-        self.assertEqual(transformed_data, sum_of_column+10)  # Sum of numbers in each cell of the input DataFrame
-if __name__ == '__main__':
-    unittest.main(argv=[''], exit=False)
+        self.assertEqual(transformed_data, sum_of_column)  # Corrected to match the function's expected behavior
 
-# COMMAND ----------
 
-source_data = pd.DataFrame({"col5": [10, 20, 30]}) 
-sum = transform_data_col(source_data)
-print(sum)
-
-# COMMAND ----------
-
-import unittest
-from pyspark.sql import SparkSession
-from pyspark.sql.functions import sum 
-
-def transform_data_column(column):
-    # Logic to transform the extracted data
-    # For demonstration, let's assume aggregation by summing integers in each cell of the DataFrame column
-    aggregated_data = column.select(sum(column[0]))
-    print(aggregated_data)
-    return aggregated_data
-
-class TestTransformDataColumn(unittest.TestCase):
-    def test_transform_data_column(self):
-        
-        # Create a sample DataFrame
-        data = [(10,), (20,), (30,), (40,), (50,), (60,), (70,), (80,), (90,)]
-        df = spark.createDataFrame(data, ['col1'])
+    def test_transform_data_avg(self):
+        # Arrange
+        source_data = pd.DataFrame({"col1": [10, 20, 30, 40, 50, 60, 70, 80, 90]})  # Sample input DataFrame
+        count = len(source_data)  # Number of elements in the DataFrame column
         
         # Act
-        transformed_data = transform_data_column(df)
-        sum_of_column = df.select(sum('col1'))
-
-        print(sum_of_column)
-        print(transformed_data)
+        transformed_data = transform_data_avg(source_data["col1"], count)
+        expected_avg = source_data["col1"].sum() / count
         
         # Assert
-        # self.assertEqual(transformed_data, sum_of_column + 10)  # Sum of numbers in each cell of the input DataFrame
+        self.assertEqual(transformed_data, expected_avg)  # Check if the calculated average is correct
+    
+    def test_transform_data_avg_with_custom_count(self):
+        # Arrange
+        source_data = pd.DataFrame({"col1": [10, 20, 30, 40, 50, 60, 70, 80, 90]})  # Sample input DataFrame
+        count = 5  # Custom count that is not equal to the length of the column
+        
+        # Act
+        transformed_data = transform_data_avg(source_data["col1"], count)
+        expected_avg = source_data["col1"].sum() / count
+        
+        # Assert
+        self.assertEqual(transformed_data, expected_avg)  # Check if the calculated average with custom count is correct
+    
+    def test_transform_data_avg_with_zero_count(self):
+        # Arrange
+        source_data = pd.DataFrame({"col1": [10, 20, 30, 40, 50, 60, 70, 80, 90]})  # Sample input DataFrame
+        count = 0  # Count is zero to test division by zero handling
+        
+        # Act & Assert
+        with self.assertRaises(ZeroDivisionError):
+            transform_data_avg(source_data["col1"], count)  # Check if division by zero raises an error
+    
+    def test_transform_data_avg_with_empty_column(self):
+        # Arrange
+        source_data = pd.DataFrame({"col1": []})  # Empty DataFrame column
+        count = 1  # Count is non-zero to test handling of empty column
+        
+        # Act
+        transformed_data = transform_data_avg(source_data["col1"], count)
+        expected_avg = 0  # Average of an empty column is zero
+        
+        # Assert
+        self.assertEqual(transformed_data, expected_avg)  # Check if the calculated average is correct for empty column
 
 if __name__ == '__main__':
     unittest.main(argv=[''], exit=False)
 
+        
 
-# COMMAND ----------
 
-data = [(10,), (20,), (30,), (40,), (50,), (60,), (70,), (80,), (90,)]
-        df = spark.createDataFrame(data, ['col1'])
+
+
